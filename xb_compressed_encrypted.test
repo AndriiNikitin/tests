@@ -25,12 +25,16 @@ exec $XTRABACKUP --defaults-file=$MYSQLTEST_VARDIR/my.cnf --backup --target-dir=
 
 drop table t1;
 
+echo # try with incorrect secret, expect fail
+exec $XTRABACKUP  --prepare --file_key_management_filekey=secret1 --target-dir=$targetdir;
+
+echo # now expect success
 exec $XTRABACKUP  --prepare --target-dir=$targetdir;
-exec $XTRABACKUP  --stats --datadir=$targetdir;
--- source include/restart_and_restore.inc
+--source include/restart_and_restore.inc
 
 select sum(c1) from t1;
 DROP TABLE t1;
+drop procedure innodb_insert_proc;
 force-rmdir $targetdir;
 
 --disable_quiet_exec
