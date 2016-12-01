@@ -1,0 +1,36 @@
+--enable_quiet_exec
+CREATE TABLE t1(c1 INT, b VARCHAR(240)) ENGINE=INNODB ROW_FORMAT=compressed;
+
+DELIMITER //;
+CREATE PROCEDURE innodb_insert_proc (REPEAT_COUNT INT)
+BEGIN
+  DECLARE CURRENT_NUM INT;
+  SET CURRENT_NUM = 0;
+  WHILE CURRENT_NUM < REPEAT_COUNT DO
+    INSERT INTO t1 VALUES(CURRENT_NUM, concat(uuid(), CURRENT_NUM, repeat('ab', floor(rand()*100) ), uuid()));
+    SET CURRENT_NUM = CURRENT_NUM + 1;
+  END WHILE;
+END//
+DELIMITER ;//
+COMMIT;
+
+SET AUTOCOMMIT=0;
+CALL innodb_insert_proc(5000);
+COMMIT;
+
+
+echo # xtrabackup backup;
+let $targetdir=$MYSQLTEST_VARDIR/tmp/backup;
+exec $XTRABACKUP --defaults-file=$MYSQLTEST_VARDIR/my.cnf --backup --target-dir=$targetdir;
+
+drop table t1;
+
+exec $XTRABACKUP  --prepare --target-dir=$targetdir;
+exec $XTRABACKUP  --stats --datadir=$targetdir;
+-- source include/restart_and_restore.inc
+
+select sum(c1) from t1;
+DROP TABLE t1;
+force-rmdir $targetdir;
+
+--disable_quiet_exec
